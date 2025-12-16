@@ -1,4 +1,4 @@
-# MedToXAi Platform
+# DeNovo AI Platform
 
 AI-powered molecular toxicity prediction system with OCR-based ingredient extraction and intelligent chemical safety assessment.
 
@@ -6,14 +6,11 @@ AI-powered molecular toxicity prediction system with OCR-based ingredient extrac
 
 ## Overview
 
-MedToXAi is an end-to-end AI platform designed to analyze pharmaceutical products and predict molecular toxicity across multiple biological endpoints. The system combines OCR-based image analysis, cheminformatics, machine learning models, and large language models to support early-stage drug safety assessment.
+DeNovo AI is an end-to-end AI platform designed to analyze pharmaceutical products and predict molecular toxicity across multiple biological endpoints. The system combines OCR-based image analysis, cheminformatics, machine learning models, and large language models to support early-stage drug safety assessment.
 
 ---
 
 ## Features
-
-- Image-based medicine label analysis using OCR
-- Automated ingredient extraction from uploaded images
 - Molecular toxicity prediction across 12 biological endpoints
 - AI-assisted chemical safety interpretation using Groq LLaMA 3.3
 - Real-time analytical visualizations
@@ -27,13 +24,12 @@ MedToXAi is an end-to-end AI platform designed to analyze pharmaceutical product
 - Python 3.8 or higher
 - Node.js 16 or higher
 - Groq API key
-- Supabase account (optional)
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/medtox-scan-ai.git
+git clone https://github.com/yourusername/DeNovo.git
 cd medtox-scan-ai
 
 # Backend setup
