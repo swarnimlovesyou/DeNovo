@@ -19,7 +19,7 @@ class GroqConfig:
     """Groq AI configuration and client management"""
     
     def __init__(self):
-        # Groq API configuration - load from environment variables
+        # Groq API configuration - load from environment variables with fallback for deployment
         self.api_key = os.getenv('GROQ_API_KEY', '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')
         self.default_model = os.getenv('AI_MODEL', 'llama-3.3-70b-versatile')
         
