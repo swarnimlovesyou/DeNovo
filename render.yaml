@@ -1,15 +1,16 @@
 services:
   # Backend Service (Python Flask API)
   - type: web
-    name: medtoxai-backend
+    name: denovo-backend
     env: python
     region: oregon
     plan: free
-    buildCommand: "cd backend && pip install -r requirements.txt"
-    startCommand: "cd backend && gunicorn --bind 0.0.0.0:$PORT app:app --workers 2 --timeout 120"
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app --workers 2 --timeout 120
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 3.10.13
       - key: GROQ_API_KEY
         sync: false
       - key: SUPABASE_URL
