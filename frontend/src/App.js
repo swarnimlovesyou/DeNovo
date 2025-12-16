@@ -85,8 +85,6 @@ function App() {
 
         {/* Global Components */}
         <OnboardingTutorial />
-        <QuickHelp />
-        <ChemBioBot />
       </div>
     </NotificationProvider>
   );

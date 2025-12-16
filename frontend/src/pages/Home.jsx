@@ -111,47 +111,91 @@ const Home = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-black via-gray-950 to-black relative overflow-hidden">
+      <section className="pt-32 pb-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-black via-gray-950 to-black relative overflow-hidden min-h-[90vh] flex items-center">
         {/* Animated background gradients */}
-        <div className="absolute inset-0 bg-gradient-to-r from-primary-500/5 via-accent-500/5 to-primary-500/5 animate-pulse"></div>
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary-500/20 rounded-full filter blur-3xl opacity-20"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent-500/20 rounded-full filter blur-3xl opacity-20"></div>
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary-500/20 rounded-full filter blur-3xl opacity-20 animate-pulse"></div>
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent-500/20 rounded-full filter blur-3xl opacity-20 animate-pulse" style={{ animationDelay: '1s' }}></div>
+          <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-primary-400/10 rounded-full filter blur-2xl opacity-30 animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+        </div>
         
-        <div className="max-w-7xl mx-auto relative z-10">
-          <div className="text-center max-w-4xl mx-auto">
-            <div className="inline-flex items-center px-4 py-1.5 mb-6 bg-gradient-to-r from-primary-500/20 to-accent-500/20 border border-primary-500/30 rounded-full backdrop-blur-sm">
-              <SparklesIcon className="h-4 w-4 text-primary-400 mr-2" />
-              <span className="text-sm font-medium bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">
+        {/* Grid pattern overlay */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(6,182,212,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.03)_1px,transparent_1px)] bg-[size:64px_64px]"></div>
+        
+        <div className="max-w-7xl mx-auto relative z-10 w-full">
+          <div className="text-center max-w-5xl mx-auto">
+            {/* Badge */}
+            <div className="inline-flex items-center px-5 py-2 mb-8 bg-gradient-to-r from-primary-500/20 to-accent-500/20 border border-primary-500/30 rounded-full backdrop-blur-sm hover:border-primary-500/50 transition-all duration-300 shadow-lg shadow-primary-500/10">
+              <SparklesIcon className="h-5 w-5 text-primary-400 mr-2 animate-pulse" />
+              <span className="text-sm font-semibold bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent tracking-wide">
                 AI-Powered Drug Discovery Platform
               </span>
             </div>
             
-            <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
-              <span className="bg-gradient-to-r from-primary-400 via-accent-400 to-primary-400 bg-clip-text text-transparent">
-                AI-Powered Drug Toxicity &<br />ADMET Prediction
+            {/* Main Heading */}
+            <h1 className="text-5xl md:text-7xl font-bold text-white mb-8 leading-[1.1] tracking-tight">
+              <span className="block bg-gradient-to-r from-primary-400 via-accent-400 to-primary-500 bg-clip-text text-transparent animate-gradient">
+                AI-Powered Drug
+              </span>
+              <span className="block bg-gradient-to-r from-accent-400 via-primary-400 to-accent-500 bg-clip-text text-transparent mt-2 animate-gradient" style={{ animationDelay: '0.2s' }}>
+                Toxicity & ADMET
+              </span>
+              <span className="block bg-gradient-to-r from-primary-500 via-accent-400 to-primary-400 bg-clip-text text-transparent mt-2 animate-gradient" style={{ animationDelay: '0.4s' }}>
+                Prediction
               </span>
             </h1>
             
-            <p className="text-xl text-gray-400 mb-10 leading-relaxed">
-              Predict toxicity, pharmacokinetics, and ADMET properties using state-of-the-art 
-              deep learning models. Accelerate your drug discovery process with research-grade predictions.
+            {/* Subtitle */}
+            <p className="text-lg md:text-xl text-gray-300 mb-12 leading-relaxed max-w-3xl mx-auto font-light">
+              Predict drug properties using deep learning models. 
+              <span className="block mt-2 text-gray-400">Accelerate your drug discovery with AI-powered predictions.</span>
             </p>
             
-            <div className="flex items-center justify-center gap-4">
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-5 mb-12">
               <button
                 onClick={() => navigate('/app/predictions')}
-                className="group flex items-center px-8 py-4 bg-gradient-to-r from-primary-600 to-accent-600 text-white font-semibold rounded-lg hover:from-primary-500 hover:to-accent-500 transition-all shadow-xl shadow-primary-500/30 hover:shadow-2xl hover:shadow-primary-500/50"
+                className="group relative px-10 py-5 bg-gradient-to-r from-primary-600 via-accent-600 to-primary-600 bg-[length:200%_100%] text-white font-bold text-lg rounded-xl hover:bg-[position:100%_0] transition-all duration-500 shadow-2xl shadow-primary-500/40 hover:shadow-primary-500/60 hover:scale-105 transform w-full sm:w-auto"
               >
-                Start Prediction
-                <ArrowRightIcon className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                <span className="flex items-center justify-center">
+                  Start Prediction
+                  <ArrowRightIcon className="ml-3 h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
+                </span>
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
               </button>
               
               <button
                 onClick={() => navigate('/app/chat')}
-                className="px-8 py-4 bg-white/5 text-white font-semibold rounded-lg border border-primary-500/30 hover:bg-white/10 hover:border-primary-500/50 transition-all backdrop-blur-sm"
+                className="group px-10 py-5 bg-transparent text-white font-bold text-lg rounded-xl border-2 border-primary-500/50 hover:border-primary-400 hover:bg-primary-500/10 transition-all backdrop-blur-sm hover:scale-105 transform w-full sm:w-auto shadow-lg shadow-primary-500/20"
               >
-                AI Assistant
+                <span className="flex items-center justify-center">
+                  <SparklesIcon className="mr-3 h-6 w-6 group-hover:rotate-180 transition-transform duration-500" />
+                  AI Assistant
+                </span>
               </button>
+            </div>
+            
+            {/* Stats Bar */}
+            <div className="flex flex-wrap items-center justify-center gap-8 pt-8 border-t border-primary-500/20">
+              <div className="text-center">
+                <div className="text-3xl font-bold bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">6+</div>
+                <div className="text-sm text-gray-400 mt-1">GIN Models</div>
+              </div>
+              <div className="h-8 w-px bg-primary-500/30"></div>
+              <div className="text-center">
+                <div className="text-3xl font-bold bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">95%+</div>
+                <div className="text-sm text-gray-400 mt-1">Accuracy</div>
+              </div>
+              <div className="h-8 w-px bg-primary-500/30"></div>
+              <div className="text-center">
+                <div className="text-3xl font-bold bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">&lt;1s</div>
+                <div className="text-sm text-gray-400 mt-1">Response Time</div>
+              </div>
+              <div className="h-8 w-px bg-primary-500/30"></div>
+              <div className="text-center">
+                <div className="text-3xl font-bold bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">API</div>
+                <div className="text-sm text-gray-400 mt-1">Ready</div>
+              </div>
             </div>
           </div>
         </div>
