@@ -46,8 +46,6 @@ npm install
 # Backend: python app.py (port 5000)
 # Frontend: npm start (port 3000)
 Project Structure
-pgsql
-Copy code
 medtox-scan-ai/
 ├── backend/           Flask API server
 ├── frontend/          React application
@@ -66,7 +64,6 @@ Model Training
 Train toxicity prediction models using curated datasets:
 
 bash
-Copy code
 cd model-training
 python scripts/train_models.py --data data/tox21_data.csv
 Refer to the Model Training Guide for configuration and evaluation details.
