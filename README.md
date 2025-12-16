@@ -54,15 +54,12 @@ medtox-scan-ai/
 ├── model-training/    Machine learning training pipeline
 ├── docs/              Documentation
 └── tests/             Automated tests
+
 Documentation
 Quick Start Guide: docs/guides/QUICK_START.md
-
 Deployment Guide: docs/guides/DEPLOYMENT_GUIDE.md
-
 Model Training Guide: docs/training/MODEL_TRAINING_GUIDE.md
-
 API Documentation: docs/guides/API_DOCUMENTATION.md
-
 Full Documentation Index: docs/README.md
 
 Model Training
@@ -77,46 +74,30 @@ Refer to the Model Training Guide for configuration and evaluation details.
 Technologies
 Backend
 Flask for API services
-
 XGBoost for toxicity prediction models
-
 RDKit for molecular descriptor computation
-
 Groq AI (LLaMA 3.3) for chemical reasoning
-
 Supabase (PostgreSQL) for data storage
 
 Frontend
 React 18 for user interface
-
 Tailwind CSS for styling
-
 Recharts for data visualization
-
 Tesseract.js for OCR processing
-
 React Hot Toast for notifications
 
 Performance
 Average prediction time: ~200 ms per molecule
-
 Batch processing throughput: ~50 molecules per minute
-
 Mean ROC-AUC: >84%
-
 API response latency: 500–800 ms
-
 Cache hit rate: approximately 60–70%
 
 Security
 Input validation and sanitization
-
 API rate limiting (default: 60 requests per minute)
-
 CORS protection
-
 Secure environment variable handling
-
 Encrypted database connections
 
 Contributing
@@ -127,16 +108,11 @@ This project is released under the MIT License. See the LICENSE file for details
 
 Acknowledgments
 Tox21 Challenge for toxicity datasets
-
 RDKit for cheminformatics tooling
-
 Groq for LLM inference
-
 Supabase for database infrastructure
 
 Support
 Documentation: docs/README.md
-
 Issue tracking: GitHub Issues
-
 Contact: support@medtoxai.com
