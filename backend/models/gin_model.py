@@ -44,6 +44,7 @@ class GINConv(nn.Module):
     def forward(self, x, edge_index, edge_attr=None):
         """
         Forward pass with neighbor aggregation
+        Handles both 1D edge_attr (old) and 2D edge_attr (new with bond type + direction)
         """
         # Manual message passing for GIN
         row, col = edge_index
@@ -55,7 +56,14 @@ class GINConv(nn.Module):
             if len(neighbors) > 0:
                 neighbor_features = x[neighbors]
                 if edge_attr is not None and self.edge_embedding1 is not None:
-                    edge_features = self.edge_embedding1(edge_attr[row == i])
+                    # Handle 2D edge_attr [num_edges, 2] -> extract bond type (first column)
+                    if edge_attr.dim() == 2:
+                        edge_type = edge_attr[row == i, 0]  # Take bond type column
+                        edge_dir = edge_attr[row == i, 1]   # Take bond direction column
+                        edge_features = self.edge_embedding1(edge_type) + self.edge_embedding2(edge_dir)
+                    else:
+                        # 1D edge_attr [num_edges] (old format)
+                        edge_features = self.edge_embedding1(edge_attr[row == i])
                     neighbor_features = neighbor_features + edge_features
                 out[i] = neighbor_features.sum(dim=0)
         
@@ -184,36 +192,44 @@ def smiles_to_graph_pyg(smiles):
     
     x = torch.tensor(x, dtype=torch.long)
     
-    # Edge features (bonds)
-    edge_index = []
-    edge_attr = []
+    # Edge features (bonds) - must be 2D: [bond_type, bond_direction]
+    row, col = [], []
+    edge_feat = []
+    
+    # Bond type and direction mappings (matching dataset_test.py)
+    BOND_LIST = [Chem.rdchem.BondType.SINGLE, Chem.rdchem.BondType.DOUBLE,
+                 Chem.rdchem.BondType.TRIPLE, Chem.rdchem.BondType.AROMATIC]
+    BONDDIR_LIST = [Chem.rdchem.BondDir.NONE, Chem.rdchem.BondDir.ENDUPRIGHT, 
+                    Chem.rdchem.BondDir.ENDDOWNRIGHT]
     
     for bond in mol.GetBonds():
-        i = bond.GetBeginAtomIdx()
-        j = bond.GetEndAtomIdx()
+        start, end = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        row += [start, end]
+        col += [end, start]
         
-        # Bond type encoding
-        bond_type = bond.GetBondType()
-        if bond_type == Chem.rdchem.BondType.SINGLE:
-            bond_feature = 0
-        elif bond_type == Chem.rdchem.BondType.DOUBLE:
-            bond_feature = 1
-        elif bond_type == Chem.rdchem.BondType.TRIPLE:
-            bond_feature = 2
-        else:
-            bond_feature = 0
+        # Bond type index
+        try:
+            bond_type_idx = BOND_LIST.index(bond.GetBondType())
+        except:
+            bond_type_idx = 0  # default to SINGLE
         
-        # Add both directions (undirected graph)
-        edge_index.extend([[i, j], [j, i]])
-        edge_attr.extend([bond_feature, bond_feature])
+        # Bond direction index
+        try:
+            bond_dir_idx = BONDDIR_LIST.index(bond.GetBondDir())
+        except:
+            bond_dir_idx = 0  # default to NONE
+        
+        # Add edge features for both directions
+        edge_feat.append([bond_type_idx, bond_dir_idx])
+        edge_feat.append([bond_type_idx, bond_dir_idx])
     
-    if len(edge_index) == 0:
-        # Single atom molecule - add self-loop
-        edge_index = [[0, 0]]
-        edge_attr = [0]
-    
-    edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
-    edge_attr = torch.tensor(edge_attr, dtype=torch.long)
+    if len(row) == 0:
+        # Single atom molecule - no edges needed (GINet handles this)
+        edge_index = torch.zeros((2, 0), dtype=torch.long)
+        edge_attr = torch.zeros((0, 2), dtype=torch.long)
+    else:
+        edge_index = torch.tensor([row, col], dtype=torch.long)
+        edge_attr = torch.tensor(np.array(edge_feat), dtype=torch.long).view(-1, 2)
     
     # Create Data object
     data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)

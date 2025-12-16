@@ -5,11 +5,15 @@ import {
   UserIcon,
   CpuChipIcon,
   XMarkIcon,
-  ChatBubbleLeftRightIcon
+  ChatBubbleLeftRightIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon
 } from '@heroicons/react/24/outline';
 
 const ChemBioBot = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [configStatus, setConfigStatus] = useState(null);
+  const [showConfigHelp, setShowConfigHelp] = useState(false);
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -21,6 +25,26 @@ const ChemBioBot = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // Check configuration status on mount
+  useEffect(() => {
+    const checkConfig = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/config/status');
+        if (response.ok) {
+          const data = await response.json();
+          setConfigStatus(data);
+          // Show config help if API key is not set
+          if (!data.groq?.api_key_set) {
+            setShowConfigHelp(true);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check config status:', error);
+      }
+    };
+    checkConfig();
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -37,7 +61,7 @@ const ChemBioBot = () => {
       process: 'The process includes: 1) Preclinical testing (in vitro and animal studies), 2) Clinical trials (Phase I-III), 3) Regulatory review, 4) Post-market surveillance.',
       endpoints: 'Key safety endpoints include acute toxicity, chronic toxicity, carcinogenicity, reproductive toxicity, genotoxicity, and organ-specific toxicities.',
       regulations: 'Governed by FDA, EMA, and other regulatory agencies following ICH guidelines for safety assessment.',
-      technologies: 'Modern approaches include computational toxicology, organ-on-chip models, and AI-powered prediction platforms like MedToXAi.'
+      technologies: 'Modern approaches include computational toxicology, organ-on-chip models, and AI-powered prediction platforms like DeNovo.'
     },
     'toxicity testing': {
       definition: 'Systematic evaluation of adverse effects caused by chemical exposure to living organisms.',
@@ -172,7 +196,7 @@ const ChemBioBot = () => {
 
       // Enhanced general topic responses
       if (lowerMessage.includes('drug safety') || lowerMessage.includes('pharmaceutical testing')) {
-        return `**Drug Safety Testing Overview** 🧪\n\nDrug safety testing is a comprehensive, multi-stage process:\n\n**1. Preclinical Testing:**\n• In vitro assays (cell-based)\n• Animal studies (toxicology)\n• ADME studies\n\n**2. Clinical Trials:**\n• Phase I: Safety in humans\n• Phase II: Efficacy studies\n• Phase III: Large-scale trials\n\n**3. Regulatory Review:**\n• FDA/EMA evaluation\n• Risk-benefit analysis\n\n**4. Post-Market Surveillance:**\n• Ongoing safety monitoring\n• Adverse event reporting\n\n**Modern Approaches:**\n• Computational toxicology\n• AI-powered prediction (like MedToXAi)\n• Organ-on-chip technologies\n• Alternative testing methods (3Rs principle)`;
+        return `**Drug Safety Testing Overview** 🧪\n\nDrug safety testing is a comprehensive, multi-stage process:\n\n**1. Preclinical Testing:**\n• In vitro assays (cell-based)\n• Animal studies (toxicology)\n• ADME studies\n\n**2. Clinical Trials:**\n• Phase I: Safety in humans\n• Phase II: Efficacy studies\n• Phase III: Large-scale trials\n\n**3. Regulatory Review:**\n• FDA/EMA evaluation\n• Risk-benefit analysis\n\n**4. Post-Market Surveillance:**\n• Ongoing safety monitoring\n• Adverse event reporting\n\n**Modern Approaches:**\n• Computational toxicology\n• AI-powered prediction (like DeNovo)\n• Organ-on-chip technologies\n• Alternative testing methods (3Rs principle)`;
       }
 
       if (lowerMessage.includes('toxicity endpoint') || lowerMessage.includes('tox screen')) {
@@ -188,7 +212,7 @@ const ChemBioBot = () => {
       }
 
       if (lowerMessage.includes('computational') || lowerMessage.includes('ai') || lowerMessage.includes('prediction')) {
-        return `**Computational Chemistry & AI in Drug Discovery** 🤖\n\n**AI Applications:**\n• Toxicity prediction (like MedToXAi)\n• Drug-target interaction modeling\n• ADME property prediction\n• Lead optimization\n\n**Methods:**\n• Machine learning algorithms\n• Deep neural networks\n• QSAR modeling\n• Molecular dynamics simulations\n\n**Benefits:**\n• Faster screening\n• Reduced animal testing\n• Cost-effective development\n• Better success rates\n\n**Our Platform:** MedToXAi predicts toxicity across 5 key endpoints using advanced ML models trained on comprehensive datasets.`;
+        return `**Computational Chemistry & AI in Drug Discovery** 🤖\n\n**AI Applications:**\n• Toxicity prediction (like DeNovo)\n• Drug-target interaction modeling\n• ADME property prediction\n• Lead optimization\n\n**Methods:**\n• Machine learning algorithms\n• Deep neural networks\n• QSAR modeling\n• Molecular dynamics simulations\n\n**Benefits:**\n• Faster screening\n• Reduced animal testing\n• Cost-effective development\n• Better success rates\n\n**Our Platform:** DeNovo predicts toxicity across 5 key endpoints using advanced ML models trained on comprehensive datasets.`;
       }
 
       // Default enhanced response
@@ -254,6 +278,12 @@ const ChemBioBot = () => {
         className="fixed bottom-20 right-6 bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 z-40"
       >
         <ChatBubbleLeftRightIcon className="h-6 w-6" />
+        {showConfigHelp && (
+          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+          </span>
+        )}
       </button>
 
       {/* Chat Window */}
@@ -277,6 +307,46 @@ const ChemBioBot = () => {
               <XMarkIcon className="h-5 w-5" />
             </button>
           </div>
+
+          {/* Configuration Help Banner */}
+          {showConfigHelp && configStatus && !configStatus.groq?.api_key_set && (
+            <div className="p-3 bg-yellow-50 border-b border-yellow-200">
+              <div className="flex items-start space-x-2">
+                <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 text-xs">
+                  <p className="font-semibold text-yellow-800 mb-1">Groq API Key Required</p>
+                  <p className="text-yellow-700 mb-2">
+                    To use the AI assistant, you need to configure your Groq API key.
+                  </p>
+                  <button
+                    onClick={() => {
+                      const instructions = configStatus.groq?.instructions;
+                      if (instructions) {
+                        const msg = `📋 **Groq API Key Setup Instructions**\n\n**File Location:** \`${instructions.file}\`\n\n**Steps:**\n${instructions.steps.join('\n')}\n\n**Example:**\n\`\`\`\n${instructions.example}\n\`\`\`\n\nOnce configured, restart the backend server and I'll be fully operational! 🚀`;
+                        
+                        setMessages(prev => [...prev, {
+                          id: Date.now(),
+                          role: 'assistant',
+                          content: msg,
+                          timestamp: new Date().toISOString()
+                        }]);
+                        setShowConfigHelp(false);
+                      }
+                    }}
+                    className="text-yellow-700 hover:text-yellow-900 font-medium underline"
+                  >
+                    Show setup instructions
+                  </button>
+                </div>
+                <button
+                  onClick={() => setShowConfigHelp(false)}
+                  className="text-yellow-600 hover:text-yellow-800"
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">

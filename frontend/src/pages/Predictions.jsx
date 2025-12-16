@@ -33,6 +33,9 @@ const Predictions = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [nlSuggestions, setNLSuggestions] = useState([]);
+  const [moleculeImage, setMoleculeImage] = useState(null);
+  const [moleculeProps, setMoleculeProps] = useState(null);
+  const [isLoadingImage, setIsLoadingImage] = useState(false);
   
   // Enhanced hooks
   const { history, addPrediction, clearHistory } = usePredictionHistory();
@@ -458,11 +461,47 @@ const Predictions = () => {
       
       setResults(transformedResults);
       
+      // Fetch molecular visualization
+      fetchMolecularVisualization(smilesForPrediction);
+      
     } catch (error) {
       console.error('Prediction error:', error);
       alert(`Prediction failed: ${error.message}`);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchMolecularVisualization = async (smiles) => {
+    setIsLoadingImage(true);
+    setMoleculeImage(null);
+    setMoleculeProps(null);
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/visualize/molecule', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          smiles: smiles,
+          size: 400
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setMoleculeImage(data.image);
+          setMoleculeProps(data.properties);
+        }
+      } else {
+        console.error('Visualization failed');
+      }
+    } catch (error) {
+      console.error('Visualization error:', error);
+    } finally {
+      setIsLoadingImage(false);
     }
   };
 
@@ -986,6 +1025,80 @@ const Predictions = () => {
                   Generated on {results.timestamp}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Molecular Structure Visualization */}
+          {results && (
+            <div className="bg-white rounded-xl shadow-soft p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <BeakerIcon className="w-5 h-5 mr-2 text-blue-600" />
+                Molecular Structure
+              </h2>
+              
+              {isLoadingImage ? (
+                <div className="flex items-center justify-center h-64 bg-gray-50 rounded-lg">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-sm text-gray-600 mt-4">Generating molecular structure...</p>
+                  </div>
+                </div>
+              ) : moleculeImage ? (
+                <div className="space-y-4">
+                  {/* Molecular Image */}
+                  <div className="flex justify-center bg-gray-50 rounded-lg p-4">
+                    <img 
+                      src={moleculeImage} 
+                      alt="Molecular Structure" 
+                      className="max-w-full h-auto rounded"
+                    />
+                  </div>
+                  
+                  {/* Molecular Properties */}
+                  {moleculeProps && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-blue-50 rounded-lg p-3">
+                        <div className="text-xs text-blue-600 font-medium mb-1">Molecular Weight</div>
+                        <div className="text-lg font-semibold text-blue-900">
+                          {moleculeProps.molecular_weight} g/mol
+                        </div>
+                      </div>
+                      <div className="bg-green-50 rounded-lg p-3">
+                        <div className="text-xs text-green-600 font-medium mb-1">Atoms</div>
+                        <div className="text-lg font-semibold text-green-900">
+                          {moleculeProps.num_atoms}
+                        </div>
+                      </div>
+                      <div className="bg-purple-50 rounded-lg p-3">
+                        <div className="text-xs text-purple-600 font-medium mb-1">Bonds</div>
+                        <div className="text-lg font-semibold text-purple-900">
+                          {moleculeProps.num_bonds}
+                        </div>
+                      </div>
+                      <div className="bg-orange-50 rounded-lg p-3">
+                        <div className="text-xs text-orange-600 font-medium mb-1">Rings</div>
+                        <div className="text-lg font-semibold text-orange-900">
+                          {moleculeProps.num_rings}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* SMILES String Display */}
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="text-xs text-gray-600 font-medium mb-1">SMILES Notation</div>
+                    <div className="font-mono text-sm text-gray-900 break-all">
+                      {results.molecule}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 bg-gray-50 rounded-lg">
+                  <BeakerIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600">Molecular structure visualization unavailable</p>
+                  <p className="text-xs text-gray-500 mt-1">Please ensure RDKit is installed on the backend</p>
+                </div>
+              )}
             </div>
           )}
 

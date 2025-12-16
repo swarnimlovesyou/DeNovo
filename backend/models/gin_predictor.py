@@ -19,10 +19,19 @@ except ImportError:
 
 import torch.nn.functional as F
 
-# Add parent directory to path for imports
-parent_dir = str(Path(__file__).parent.parent.parent)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
+# Add paths for imports
+# gin_predictor.py is in Medtox/backend/models/
+# We need to go up to admet_pred to access dataset/
+backend_dir = Path(__file__).parent.parent  # Medtox/backend
+project_dir = backend_dir.parent  # Medtox
+admet_dir = project_dir.parent  # admet_pred
+
+if str(admet_dir) not in sys.path:
+    sys.path.insert(0, str(admet_dir))
+
+# Import dataset constants for SMILES preprocessing
+from dataset.dataset_test import ATOM_LIST, CHIRALITY_LIST, BOND_LIST, BONDDIR_LIST
+from rdkit import Chem
 
 class MultiModelPredictor:
     """Manages predictions across multiple GIN models"""
@@ -51,16 +60,16 @@ class MultiModelPredictor:
             'tox21': {
                 'name': 'Tox21',
                 'display_name': 'Tox21 Toxicity',
-                'path': 'pretrained_gin_ClinTox_model.pth',  # Using ClinTox model (2 tasks) as fallback
+                'path': 'tox21_model_full_package/model.pth',
                 'type': 'classification',
                 'task': 'toxicity',
-                'description': 'Clinical toxicity prediction (2 tasks: FDA approval + toxicity)',
-                'num_tasks': 2  # This is actually a ClinTox model with 2 tasks, not Tox21 with 12
+                'description': 'Tox21 multi-assay toxicity prediction (12 tasks)',
+                'num_tasks': 12
             },
             'clintox': {
                 'name': 'Clinical Toxicity',
                 'display_name': 'Clinical Toxicity',
-                'path': 'model.pth',
+                'path': 'pretrained_gin_ClinTox_model.pth',
                 'type': 'classification',
                 'task': 'toxicity',
                 'description': 'FDA clinical trial toxicity and approval prediction',
@@ -69,7 +78,7 @@ class MultiModelPredictor:
             'bbbp': {
                 'name': 'BBBP',
                 'display_name': 'Blood-Brain Barrier Penetration',
-                'path': 'bbbp_model_package',
+                'path': 'bbbp_model_full_package',
                 'type': 'classification',
                 'task': 'distribution',
                 'description': 'BBB permeability for CNS targeting assessment',
@@ -78,7 +87,7 @@ class MultiModelPredictor:
             'caco2': {
                 'name': 'Caco-2',
                 'display_name': 'Caco-2 Permeability',
-                'path': 'caco2_model_package',
+                'path': 'caco2_model_full_package',
                 'type': 'regression',
                 'task': 'absorption',
                 'description': 'Intestinal epithelial permeability prediction',
@@ -87,7 +96,7 @@ class MultiModelPredictor:
             'clearance': {
                 'name': 'Clearance',
                 'display_name': 'Intrinsic Clearance',
-                'path': 'clearance_model_package',
+                'path': 'clearance_model_full_package',
                 'type': 'regression',
                 'task': 'metabolism',
                 'description': 'Enzyme-mediated clearance rate prediction',
@@ -96,7 +105,7 @@ class MultiModelPredictor:
             'hlm_clint': {
                 'name': 'HLM CLint',
                 'display_name': 'HLM Intrinsic Clearance',
-                'path': 'hlm_clint_model_package',
+                'path': 'hlm_clint_model_full_package',
                 'type': 'regression',
                 'task': 'metabolism',
                 'description': 'Human liver microsomal clearance prediction',
@@ -169,7 +178,7 @@ class MultiModelPredictor:
     
     def _load_single_model(self, model_path, num_tasks=12, task_type='classification'):
         """
-        Load a single GIN model with proper architecture
+        Load a single GIN model with proper architecture (GINet)
         
         Args:
             model_path: Path to .pth checkpoint
@@ -180,12 +189,35 @@ class MultiModelPredictor:
             Loaded GIN model ready for inference
         """
         try:
-            model = load_gin_model(
-                checkpoint_path=model_path,
-                num_tasks=num_tasks,
-                device=self.device
-            )
-            return model
+            # For packaged models, load GINet from the package's models directory
+            model_path = Path(model_path)
+            package_dir = model_path.parent if model_path.name == 'model.pth' else None
+            
+            if package_dir and (package_dir / 'models' / 'ginet_finetune.py').exists():
+                # Load GINet from package
+                sys.path.insert(0, str(package_dir / 'models'))
+                from ginet_finetune import GINet
+                sys.path.pop(0)
+                
+                # Create GINet model (matches config: 5 layers, 300 emb_dim, 512 feat_dim)
+                model = GINet(num_tasks=num_tasks, num_layer=5, emb_dim=300, 
+                              feat_dim=512, drop_ratio=0.3, pool='mean')
+                
+                # Load checkpoint
+                checkpoint = torch.load(model_path, map_location=self.device)
+                model.load_state_dict(checkpoint, strict=True)
+                
+                model.to(self.device)
+                model.eval()
+                return model
+            else:
+                # Fallback to GINModel for old models (tox21, clintox)
+                model = load_gin_model(
+                    checkpoint_path=model_path,
+                    num_tasks=num_tasks,
+                    device=self.device
+                )
+                return model
             
         except Exception as e:
             print(f"Error loading model from {model_path}: {e}")
@@ -210,12 +242,45 @@ class MultiModelPredictor:
         
         # Convert SMILES to PyTorch Geometric Data object
         try:
-            data = smiles_to_graph_pyg(smiles)
-            if data is None:
+            # Use the exact same preprocessing as inference_parallel.py
+            mol = Chem.MolFromSmiles(smiles)
+            if mol is None:
                 return {'error': 'Invalid SMILES string'}
+            mol = Chem.AddHs(mol)
             
-            # Add batch information
-            data.batch = torch.zeros(data.x.size(0), dtype=torch.long)
+            type_idx = []
+            chirality_idx = []
+            for atom in mol.GetAtoms():
+                type_idx.append(ATOM_LIST.index(atom.GetAtomicNum()))
+                chirality_idx.append(CHIRALITY_LIST.index(atom.GetChiralTag()))
+            
+            x1 = torch.tensor(type_idx, dtype=torch.long).view(-1, 1)
+            x2 = torch.tensor(chirality_idx, dtype=torch.long).view(-1, 1)
+            x = torch.cat([x1, x2], dim=-1)
+            
+            row, col, edge_feat = [], [], []
+            for bond in mol.GetBonds():
+                start, end = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+                row += [start, end]
+                col += [end, start]
+                edge_feat.append([
+                    BOND_LIST.index(bond.GetBondType()),
+                    BONDDIR_LIST.index(bond.GetBondDir())
+                ])
+                edge_feat.append([
+                    BOND_LIST.index(bond.GetBondType()),
+                    BONDDIR_LIST.index(bond.GetBondDir())
+                ])
+            
+            if len(row) == 0:
+                edge_index = torch.empty((2, 0), dtype=torch.long)
+                edge_attr = torch.empty((0, 2), dtype=torch.long)
+            else:
+                edge_index = torch.tensor([row, col], dtype=torch.long)
+                edge_attr = torch.tensor(np.array(edge_feat), dtype=torch.long).view(-1, 2)
+            
+            data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr)
+            data.batch = torch.zeros(x.size(0), dtype=torch.long)
             
             # Move to device
             data = data.to(self.device)
@@ -239,11 +304,17 @@ class MultiModelPredictor:
                 
                 # Run inference
                 with torch.no_grad():
-                    output = model(data)  # [1, num_tasks]
+                    output = model(data)
+                    
+                    # Handle models that return (features, predictions) vs just predictions
+                    if isinstance(output, tuple) and len(output) == 2:
+                        _, predictions = output
+                    else:
+                        predictions = output
                     
                     if info['type'] == 'classification':
                         # Apply sigmoid for binary classification
-                        probabilities = torch.sigmoid(output).cpu().numpy()[0]
+                        probabilities = torch.sigmoid(predictions).cpu().numpy()[0]
                         
                         if model_id == 'tox21':
                             # Multi-task: return average toxicity probability
@@ -274,30 +345,124 @@ class MultiModelPredictor:
                                 'clinical_tox_prob': tox_prob
                             }
                         else:
-                            # Single binary classification
+                            # Single binary classification (BBBP)
                             prob = float(probabilities[0])
                             prediction = 1 if prob > 0.5 else 0
+                            
+                            # For BBBP: 1 = BBB permeable, 0 = not permeable
+                            if model_id == 'bbbp':
+                                label = 'BBB Permeable' if prediction == 1 else 'Non-permeable'
+                            else:
+                                label = 'Positive' if prediction == 1 else 'Negative'
                             
                             results[model_id] = {
                                 'prediction': int(prediction),
                                 'probability': prob,
-                                'label': 'Positive' if prediction == 1 else 'Negative',
+                                'label': label,
                                 'type': 'classification'
                             }
                     
                     else:  # Regression
-                        value = float(output.cpu().numpy()[0, 0])
+                        raw_value = float(predictions.cpu().numpy()[0, 0])
                         
-                        results[model_id] = {
-                            'prediction': value,
-                            'value': value,
-                            'type': 'regression'
-                        }
+                        # Apply transformations based on model type
+                        if model_id in ['clearance', 'hlm_clint']:
+                            # Models output log-scale values -> apply exp() for linear scale
+                            # Match inference_parallel.py: math.exp(raw_value)
+                            linear_value = float(np.exp(raw_value))
+                            
+                            results[model_id] = {
+                                'prediction': raw_value,  # log scale
+                                'value': raw_value,  # log scale
+                                'linear_value': linear_value,  # exp(log) = linear
+                                'type': 'regression',
+                                'unit': 'mL/min/kg' if model_id == 'clearance' else 'μL/min/mg protein'
+                            }
+                        elif model_id == 'caco2':
+                            # Caco-2 permeability (log Papp)
+                            # Don't clip - allow full range
+                            pass
+                            
+                            results[model_id] = {
+                                'prediction': raw_value,
+                                'value': raw_value,
+                                'type': 'regression',
+                                'unit': 'log Papp (cm/s)'
+                            }
+                        else:
+                            results[model_id] = {
+                                'prediction': raw_value,
+                                'value': raw_value,
+                                'type': 'regression'
+                            }
                     
             except Exception as e:
                 results[model_id] = {
                     'error': str(e)
                 }
+        
+        return results
+    
+    def predict_batch(self, smiles_list):
+        """
+        Run predictions on multiple SMILES strings
+        
+        Args:
+            smiles_list (list): List of SMILES strings
+        
+        Returns:
+            list: List of prediction results for each SMILES
+        """
+        from datetime import datetime
+        
+        results = []
+        for smiles in smiles_list:
+            try:
+                # Get predictions for this molecule
+                predictions = self.predict(smiles)
+                
+                # Calculate summary statistics
+                toxic_count = 0
+                total_prob = 0
+                count = 0
+                
+                for model_id, pred_data in predictions.items():
+                    if 'error' not in pred_data and pred_data.get('type') == 'classification':
+                        prob = pred_data.get('probability', 0)
+                        if isinstance(prob, (int, float)):
+                            total_prob += prob
+                            count += 1
+                            if pred_data.get('prediction', 0) == 1:
+                                toxic_count += 1
+                
+                avg_prob = total_prob / count if count > 0 else 0
+                
+                # Determine overall assessment
+                if avg_prob > 0.7:
+                    assessment = "High Risk"
+                elif avg_prob > 0.3:
+                    assessment = "Medium Risk"
+                else:
+                    assessment = "Low Risk"
+                
+                results.append({
+                    'smiles': smiles,
+                    'timestamp': datetime.now().isoformat(),
+                    'endpoints': predictions,
+                    'summary': {
+                        'overall_assessment': assessment,
+                        'recommendation': f"{avg_prob:.1%} confidence",
+                        'toxic_endpoints': toxic_count,
+                        'average_toxicity_probability': avg_prob
+                    }
+                })
+                
+            except Exception as e:
+                results.append({
+                    'smiles': smiles,
+                    'error': str(e),
+                    'timestamp': datetime.now().isoformat()
+                })
         
         return results
     

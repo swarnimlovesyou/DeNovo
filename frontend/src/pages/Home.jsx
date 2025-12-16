@@ -88,7 +88,7 @@ const Home = () => {
                 <BeakerIcon className="h-5 w-5 text-white" />
               </div>
               <span className="text-xl font-semibold bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">
-                MedTox Platform
+                DeNovo Platform
               </span>
             </div>
             
@@ -365,7 +365,7 @@ const Home = () => {
                 <BeakerIcon className="h-4 w-4 text-white" />
               </div>
               <span className="text-lg font-semibold bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">
-                MedTox Platform
+                DeNovo Platform
               </span>
             </div>
             <p className="text-sm text-gray-400">

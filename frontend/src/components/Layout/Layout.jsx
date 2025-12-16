@@ -28,7 +28,7 @@ const Layout = () => {
       case '/contact':
         return 'Contact Support';
       default:
-        return 'MedToXAi';
+        return 'DeNovo';
     }
   };
 

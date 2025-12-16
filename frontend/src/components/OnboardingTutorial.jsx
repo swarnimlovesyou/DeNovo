@@ -20,7 +20,7 @@ const OnboardingTutorial = ({ onComplete }) => {
 
   const steps = [
     {
-      title: "Welcome to MedToXAi! 🧪",
+      title: "Welcome to DeNovo! 🧪",
       content: "Your advanced AI-powered drug toxicity prediction platform. Let's take a quick tour of the key features.",
       image: "🎯",
       highlight: null

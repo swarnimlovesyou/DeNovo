@@ -18,6 +18,9 @@ const EnhancedPredictions = () => {
   const [selectedModels, setSelectedModels] = useState(['clintox']);
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState(null);
+  const [moleculeImage, setMoleculeImage] = useState(null);
+  const [moleculeProps, setMoleculeProps] = useState(null);
+  const [isLoadingImage, setIsLoadingImage] = useState(false);
 
   const availableModels = [
     {
@@ -122,6 +125,9 @@ const EnhancedPredictions = () => {
       }
 
       setResults(data);
+      
+      // Fetch molecular visualization
+      fetchMolecularVisualization(inputValue);
 
     } catch (error) {
       console.error('Prediction error:', error);
@@ -134,13 +140,79 @@ const EnhancedPredictions = () => {
     }
   };
 
-  const getInterpretation = (model, prediction, probability) => {
+  const fetchMolecularVisualization = async (smiles) => {
+    setIsLoadingImage(true);
+    setMoleculeImage(null);
+    setMoleculeProps(null);
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/visualize/molecule', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          smiles: smiles,
+          size: 400
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setMoleculeImage(data.image);
+          setMoleculeProps(data.properties);
+        }
+      } else {
+        console.error('Visualization failed');
+      }
+    } catch (error) {
+      console.error('Visualization error:', error);
+    } finally {
+      setIsLoadingImage(false);
+    }
+  };
+
+  const getInterpretation = (modelId, model, prediction, probability, results) => {
+    // Use backend ADMET interpretations if available
+    if (results?.admet_properties) {
+      const admetMap = {
+        'bbbp': 'bbb_penetration',
+        'caco2': 'caco2_permeability',
+        'clearance': 'hepatic_clearance',
+        'hlm_clint': 'hlm_clearance'
+      };
+      
+      const admetKey = admetMap[modelId];
+      if (admetKey && results.admet_properties[admetKey]) {
+        const admet = results.admet_properties[admetKey];
+        return {
+          text: admet.label || 'Unknown',
+          color: admet.label === 'High' ? 'green' : admet.label === 'Low' ? 'red' : 'yellow',
+          interpretation: admet.interpretation
+        };
+      }
+    }
+    
+    // For toxicity models or fallback
     if (model.outputType === 'classification') {
+      // For BBBP, use the label from backend
+      if (modelId === 'bbbp') {
+        const pred = results?.predictions?.[modelId];
+        if (pred?.label) {
+          return {
+            text: pred.label,
+            color: pred.label.includes('Permeable') ? 'green' : 'red'
+          };
+        }
+      }
+      
+      // For toxicity models
       if (probability > 0.7) return { text: 'High Risk', color: 'red' };
       if (probability > 0.4) return { text: 'Moderate Risk', color: 'yellow' };
       return { text: 'Low Risk', color: 'green' };
     } else {
-      // Regression models
+      // Regression models - generic fallback
       if (prediction > 0.7) return { text: 'High', color: 'green' };
       if (prediction > 0.3) return { text: 'Moderate', color: 'yellow' };
       return { text: 'Low', color: 'red' };
@@ -155,7 +227,7 @@ const EnhancedPredictions = () => {
         ['Model', 'Prediction', 'Probability/Value', 'Interpretation'],
         ...Object.entries(results.predictions || {}).map(([modelId, pred]) => {
           const model = availableModels.find(m => m.id === modelId);
-          const interp = getInterpretation(model, pred.prediction, pred.probability);
+          const interp = getInterpretation(modelId, model, pred.prediction, pred.probability, results);
           return [
             model?.name || modelId,
             pred.prediction,
@@ -389,7 +461,32 @@ const EnhancedPredictions = () => {
                     <tbody className="divide-y divide-gray-800">
                       {Object.entries(results.predictions).map(([modelId, pred]) => {
                         const model = availableModels.find(m => m.id === modelId);
-                        const interpretation = getInterpretation(model, pred.prediction, pred.probability);
+                        const interpretation = getInterpretation(modelId, model, pred.prediction, pred.probability, results);
+                        
+                        // Get display value from backend ADMET properties or predictions
+                        let displayValue = '';
+                        const admetMap = {
+                          'bbbp': 'bbb_penetration',
+                          'caco2': 'caco2_permeability',
+                          'clearance': 'hepatic_clearance',
+                          'hlm_clint': 'hlm_clearance'
+                        };
+                        
+                        const admetKey = admetMap[modelId];
+                        if (admetKey && results.admet_properties?.[admetKey]) {
+                          const admet = results.admet_properties[admetKey];
+                          if (admet.linear_value !== undefined) {
+                            displayValue = `${admet.linear_value.toFixed(2)} ${admet.unit || ''}`;
+                          } else if (admet.log_value !== undefined) {
+                            displayValue = `${admet.log_value.toFixed(3)} ${admet.unit || ''}`;
+                          } else {
+                            displayValue = `Confidence: ${(pred.probability * 100).toFixed(1)}%`;
+                          }
+                        } else if (model?.outputType === 'classification') {
+                          displayValue = `Confidence: ${(pred.probability * 100).toFixed(1)}%`;
+                        } else {
+                          displayValue = `Value: ${pred.prediction?.toFixed(3) || 'N/A'}`;
+                        }
                         
                         return (
                           <tr key={modelId} className="hover:bg-gray-800/30 transition-colors">
@@ -407,17 +504,92 @@ const EnhancedPredictions = () => {
                                 {interpretation.text}
                               </div>
                               <div className="text-xs text-gray-500 mt-1">
-                                {model?.outputType === 'classification' 
-                                  ? `Confidence: ${(pred.probability * 100).toFixed(1)}%`
-                                  : `Value: ${pred.prediction.toFixed(3)}`
-                                }
+                                {displayValue}
                               </div>
+                              {interpretation.interpretation && (
+                                <div className="text-xs text-gray-400 mt-1">
+                                  {interpretation.interpretation}
+                                </div>
+                              )}
                             </td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Molecular Structure Visualization */}
+                <div className="border border-gray-700 rounded-lg overflow-hidden bg-gray-800/30">
+                  <div className="px-4 py-3 bg-gray-800/50 border-b border-gray-700">
+                    <h3 className="text-sm font-semibold text-gray-300 flex items-center">
+                      <CubeIcon className="w-4 h-4 mr-2 text-primary-400" />
+                      Molecular Structure
+                    </h3>
+                  </div>
+                  
+                  {isLoadingImage ? (
+                    <div className="flex items-center justify-center p-8">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-500 mx-auto mb-2"></div>
+                        <p className="text-xs text-gray-500">Generating structure...</p>
+                      </div>
+                    </div>
+                  ) : moleculeImage ? (
+                    <div className="p-4 space-y-3">
+                      {/* Molecular Image */}
+                      <div className="flex justify-center bg-white/5 rounded-lg p-3">
+                        <img 
+                          src={moleculeImage} 
+                          alt="Molecular Structure" 
+                          className="max-w-full h-auto rounded"
+                        />
+                      </div>
+                      
+                      {/* Molecular Properties */}
+                      {moleculeProps && (
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="bg-blue-900/20 border border-blue-500/30 rounded p-2">
+                            <div className="text-blue-400 font-medium mb-0.5">MW</div>
+                            <div className="text-gray-200 font-semibold">
+                              {moleculeProps.molecular_weight} g/mol
+                            </div>
+                          </div>
+                          <div className="bg-green-900/20 border border-green-500/30 rounded p-2">
+                            <div className="text-green-400 font-medium mb-0.5">Atoms</div>
+                            <div className="text-gray-200 font-semibold">
+                              {moleculeProps.num_atoms}
+                            </div>
+                          </div>
+                          <div className="bg-purple-900/20 border border-purple-500/30 rounded p-2">
+                            <div className="text-purple-400 font-medium mb-0.5">Bonds</div>
+                            <div className="text-gray-200 font-semibold">
+                              {moleculeProps.num_bonds}
+                            </div>
+                          </div>
+                          <div className="bg-orange-900/20 border border-orange-500/30 rounded p-2">
+                            <div className="text-orange-400 font-medium mb-0.5">Rings</div>
+                            <div className="text-gray-200 font-semibold">
+                              {moleculeProps.num_rings}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* SMILES Display */}
+                      <div className="bg-gray-900/50 rounded p-2">
+                        <div className="text-xs text-gray-500 mb-1">SMILES</div>
+                        <div className="font-mono text-xs text-gray-300 break-all">
+                          {inputValue}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 px-4">
+                      <CubeIcon className="w-10 h-10 text-gray-600 mx-auto mb-2" />
+                      <p className="text-xs text-gray-500">Visualization unavailable</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-primary-500/10 border border-primary-500/30 rounded-lg p-3 backdrop-blur-sm">

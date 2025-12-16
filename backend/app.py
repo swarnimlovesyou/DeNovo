@@ -12,6 +12,7 @@ import traceback
 from datetime import datetime
 import uuid
 import json
+import numpy as np
 
 # Add modules to path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'models'))
@@ -116,6 +117,39 @@ def health_check():
         'cache_stats': cache.get_stats() if cache else None
     })
 
+@app.route('/api/config/status', methods=['GET'])
+def config_status():
+    """Check API configuration status"""
+    try:
+        groq_configured = groq_client is not None
+        groq_api_key = os.getenv('GROQ_API_KEY')
+        
+        return jsonify({
+            'success': True,
+            'groq': {
+                'configured': groq_configured,
+                'api_key_set': groq_api_key is not None and len(groq_api_key.strip()) > 0,
+                'instructions': {
+                    'file': 'backend/.env',
+                    'variable': 'GROQ_API_KEY',
+                    'example': 'GROQ_API_KEY=gsk_your_api_key_here',
+                    'steps': [
+                        '1. Navigate to the Medtox/backend/ folder',
+                        '2. Create or open the .env file',
+                        '3. Add or update: GROQ_API_KEY=your_groq_api_key',
+                        '4. Restart the backend server'
+                    ]
+                }
+            },
+            'models': {
+                'loaded': predictor is not None and predictor.is_loaded,
+                'count': len(predictor.models) if predictor and predictor.is_loaded else 0
+            }
+        })
+    except Exception as e:
+        print(f"❌ Error checking config status: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/cache/stats', methods=['GET'])
 def get_cache_stats():
     """Get prediction cache statistics"""
@@ -179,21 +213,107 @@ def predict_single():
         if 'error' in result:
             return jsonify({'error': result['error']}), 500
         
-        # Calculate overall statistics
-        total_prob = 0
-        toxic_count = 0
-        valid_count = 0
+        # Separate toxicity and ADMET models
+        toxicity_models = ['tox21', 'clintox']
+        admet_models = ['bbbp', 'caco2', 'clearance', 'hlm_clint']
         
-        for model_id, model_result in result.items():
-            if 'error' not in model_result:
-                valid_count += 1
+        # Calculate toxicity statistics (classification models only)
+        tox_prob_sum = 0
+        tox_count = 0
+        toxic_endpoints = 0
+        
+        for model_id in toxicity_models:
+            if model_id in result and 'error' not in result[model_id]:
+                model_result = result[model_id]
                 if 'probability' in model_result:
-                    total_prob += model_result['probability']
+                    tox_prob_sum += model_result['probability']
+                    tox_count += 1
                     if model_result.get('prediction', 0) == 1:
-                        toxic_count += 1
+                        toxic_endpoints += 1
         
-        avg_probability = total_prob / valid_count if valid_count > 0 else 0
-        overall_toxicity = "High Risk" if avg_probability > 0.7 else "Medium Risk" if avg_probability > 0.3 else "Low Risk"
+        avg_tox_probability = tox_prob_sum / tox_count if tox_count > 0 else 0
+        overall_toxicity = "High Risk" if avg_tox_probability > 0.7 else "Medium Risk" if avg_tox_probability > 0.3 else "Low Risk"
+        
+        # Calculate ADMET property summary
+        admet_summary = {}
+        for model_id in admet_models:
+            if model_id in result and 'error' not in result[model_id]:
+                model_result = result[model_id]
+                
+                if model_id == 'bbbp':
+                    # BBB penetration (classification)
+                    prob = model_result.get('probability', 0)
+                    pred = model_result.get('prediction', 0)
+                    admet_summary['bbb_penetration'] = {
+                        'value': prob,
+                        'label': model_result.get('label', 'BBB Permeable' if pred == 1 else 'Non-permeable'),
+                        'confidence': prob,
+                        'interpretation': 'Crosses blood-brain barrier' if pred == 1 else 'Does not cross BBB'
+                    }
+                elif model_id == 'caco2':
+                    # Caco-2 permeability (regression, log scale)
+                    raw_value = model_result.get('prediction', model_result.get('value', 0))
+                    # Caco-2 log Papp thresholds: >-5.15 = high, -5.15 to -6.0 = medium, <-6.0 = low
+                    if raw_value > -5.15:
+                        label = 'High'
+                        interpretation = 'Good intestinal absorption'
+                    elif raw_value > -6.0:
+                        label = 'Medium'
+                        interpretation = 'Moderate intestinal absorption'
+                    else:
+                        label = 'Low'
+                        interpretation = 'Poor intestinal absorption'
+                    
+                    admet_summary['caco2_permeability'] = {
+                        'log_value': round(raw_value, 3),
+                        'label': label,
+                        'unit': 'log Papp (cm/s)',
+                        'interpretation': interpretation
+                    }
+                elif model_id == 'clearance':
+                    # Hepatocyte clearance (regression, log scale -> linear via exp())
+                    raw_value = model_result.get('prediction', model_result.get('value', 0))
+                    linear_value = model_result.get('linear_value', np.exp(raw_value))
+                    
+                    if linear_value > 20:
+                        label = 'High'
+                        interpretation = 'Rapid hepatic clearance'
+                    elif linear_value > 5:
+                        label = 'Medium'
+                        interpretation = 'Moderate hepatic clearance'
+                    else:
+                        label = 'Low'
+                        interpretation = 'Slow hepatic clearance'
+                    
+                    admet_summary['hepatic_clearance'] = {
+                        'log_value': round(raw_value, 3),
+                        'linear_value': round(linear_value, 2),
+                        'label': label,
+                        'unit': 'mL/min/kg',
+                        'interpretation': interpretation
+                    }
+                elif model_id == 'hlm_clint':
+                    # HLM intrinsic clearance (regression, log scale -> linear via exp())
+                    raw_value = model_result.get('prediction', model_result.get('value', 0))
+                    linear_value = model_result.get('linear_value', np.exp(raw_value))
+                    
+                    if linear_value > 10:
+                        label = 'High'
+                        interpretation = 'High metabolic clearance'
+                    elif linear_value > 2:
+                        label = 'Medium'
+                        interpretation = 'Moderate metabolic clearance'
+                    else:
+                        label = 'Low'
+                        interpretation = 'Low metabolic clearance'
+                    
+                    admet_summary['hlm_clearance'] = {
+                        'log_value': round(raw_value, 3),
+                        'linear_value': round(linear_value, 2),
+                        'label': label,
+                        'unit': 'μL/min/mg protein',
+                        'interpretation': interpretation
+                    }
         
         # Format response for frontend compatibility
         formatted_result = {
@@ -202,18 +322,22 @@ def predict_single():
             'timestamp': str(datetime.now()),
             'predictions': {},
             'overall_toxicity': overall_toxicity,
-            'confidence': f"{avg_probability:.2%}",
-            'toxic_endpoints': toxic_count,
-            'average_probability': avg_probability
+            'toxicity_confidence': f"{avg_tox_probability:.2%}",
+            'toxic_endpoints': toxic_endpoints,
+            'average_toxicity_probability': avg_tox_probability,
+            'admet_properties': admet_summary
         }
         
         # Format predictions to match frontend structure
         for model_id, model_result in result.items():
             if 'error' not in model_result:
+                # For clintox, use clinical_tox_prob if available
+                prob = model_result.get('probability', model_result.get('clinical_tox_prob', model_result.get('value', 0)))
+                
                 formatted_result['predictions'][model_id] = {
-                    'probability': model_result.get('probability', model_result.get('value', 0)),
+                    'probability': prob,
                     'prediction': model_result.get('prediction', 0),
-                    'confidence': model_result.get('probability', 1.0),
+                    'confidence': prob,
                     'risk': model_result.get('label', 'Unknown'),
                     'type': model_result.get('type', 'unknown')
                 }
@@ -306,6 +430,31 @@ def predict_batch():
                     'smiles': result.get('smiles', 'unknown'),
                     'error': result['error']
                 })
+        
+        # Save results locally instead of Supabase
+        try:
+            import json
+            import os
+            from pathlib import Path
+            
+            # Create results directory if it doesn't exist
+            results_dir = Path(__file__).parent / 'batch_results'
+            results_dir.mkdir(exist_ok=True)
+            
+            # Save to JSON file with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            results_file = results_dir / f'batch_results_{timestamp}.json'
+            
+            with open(results_file, 'w') as f:
+                json.dump({
+                    'results': formatted_results,
+                    'total_processed': len(formatted_results),
+                    'timestamp': datetime.now().isoformat()
+                }, f, indent=2)
+            
+            print(f"✅ Saved batch results to {results_file}")
+        except Exception as e:
+            print(f"⚠️ Warning: Could not save batch results locally: {e}")
         
         return jsonify({
             'results': formatted_results,
@@ -1284,60 +1433,115 @@ def get_analytics():
 
 @app.route('/api/download/results', methods=['GET'])
 def download_results():
-    """Download batch processing results as CSV"""
+    """Download batch processing results as CSV from local files"""
     try:
-        if not db_service:
-            return jsonify({'error': 'Database service not available'}), 503
-            
-        # Get format from query parameter (csv, json, excel)
+        import csv
+        import io
+        import json
+        from pathlib import Path
+        
+        # Get format from query parameter (csv, json)
         format_type = request.args.get('format', 'csv').lower()
-        limit = request.args.get('limit', 1000, type=int)
         
-        # Fetch recent predictions
-        predictions = db_service.client.table('predictions')\
-            .select('*')\
-            .order('created_at', desc=True)\
-            .limit(limit)\
-            .execute()
+        # Get batch results directory
+        results_dir = Path(__file__).parent / 'batch_results'
         
-        if not predictions.data:
-            return jsonify({'error': 'No results found'}), 404
+        # Check if directory exists and has files
+        if not results_dir.exists() or not list(results_dir.glob('batch_results_*.json')):
+            # Return helpful message instead of 404
+            if format_type == 'csv':
+                output = io.StringIO()
+                output.write('No batch results available yet.\n')
+                output.write('Please run a batch prediction first using the "Batch Processing" feature in the frontend.\n')
+                csv_data = output.getvalue()
+                output.close()
+                
+                from flask import Response
+                return Response(
+                    csv_data,
+                    mimetype='text/csv',
+                    headers={
+                        'Content-Disposition': f'attachment; filename=no_results_{datetime.now().strftime("%Y-%m-%d")}.csv'
+                    }
+                )
+            else:
+                return jsonify({
+                    'error': 'No batch results found',
+                    'message': 'Please run a batch prediction first using the Batch Processing feature'
+                }), 404
         
-        # Process data for export
+        # Get all result files, sorted by timestamp (newest first)
+        result_files = sorted(results_dir.glob('batch_results_*.json'), reverse=True)
+        
+        # Get the most recent results or combine all
+        combine_all = request.args.get('all', 'false').lower() == 'true'
+        
         export_data = []
-        for pred in predictions.data:
-            endpoints = pred.get('endpoints', {})
-            row = {
-                'SMILES': pred.get('smiles', ''),
-                'Molecule_Name': pred.get('molecule_name', 'Unknown'),
-                'Created_At': pred.get('created_at', ''),
-                'Overall_Prediction': 'Toxic' if any(
-                    v.get('prediction', '').lower() == 'toxic'
-                    for v in endpoints.values()
-                    if isinstance(v, dict)
-                ) else 'Safe'
-            }
-            
-            # Add endpoint-specific results
-            for endpoint_id, endpoint_data in endpoints.items():
-                if isinstance(endpoint_data, dict):
-                    row[f'{endpoint_id}_Prediction'] = endpoint_data.get('prediction', 'Unknown')
-                    row[f'{endpoint_id}_Probability'] = endpoint_data.get('probability', 0.0)
-                    row[f'{endpoint_id}_Confidence'] = endpoint_data.get('confidence', 'Unknown')
-            
-            export_data.append(row)
+        if combine_all:
+            # Combine all result files
+            for result_file in result_files:
+                try:
+                    with open(result_file, 'r') as f:
+                        data = json.load(f)
+                        for result in data.get('results', []):
+                            if 'error' not in result:
+                                row = {
+                                    'SMILES': result.get('smiles', ''),
+                                    'Timestamp': result.get('timestamp', ''),
+                                    'Overall_Toxicity': result.get('overall_toxicity', 'Unknown'),
+                                    'Confidence': result.get('confidence', 'Unknown'),
+                                    'Toxic_Endpoints': result.get('toxic_endpoints', 0),
+                                    'Average_Probability': result.get('average_probability', 0.0)
+                                }
+                                
+                                # Add individual model predictions
+                                for model_id, pred_data in result.get('predictions', {}).items():
+                                    if isinstance(pred_data, dict):
+                                        row[f'{model_id}_prediction'] = pred_data.get('prediction', 'Unknown')
+                                        row[f'{model_id}_probability'] = pred_data.get('probability', 0.0)
+                                
+                                export_data.append(row)
+                except Exception as e:
+                    print(f"⚠️ Error reading {result_file}: {e}")
+                    continue
+        else:
+            # Use most recent file only
+            try:
+                with open(result_files[0], 'r') as f:
+                    data = json.load(f)
+                    for result in data.get('results', []):
+                        if 'error' not in result:
+                            row = {
+                                'SMILES': result.get('smiles', ''),
+                                'Timestamp': result.get('timestamp', ''),
+                                'Overall_Toxicity': result.get('overall_toxicity', 'Unknown'),
+                                'Confidence': result.get('confidence', 'Unknown'),
+                                'Toxic_Endpoints': result.get('toxic_endpoints', 0),
+                                'Average_Probability': result.get('average_probability', 0.0)
+                            }
+                            
+                            # Add individual model predictions
+                            for model_id, pred_data in result.get('predictions', {}).items():
+                                if isinstance(pred_data, dict):
+                                    row[f'{model_id}_prediction'] = pred_data.get('prediction', 'Unknown')
+                                    row[f'{model_id}_probability'] = pred_data.get('probability', 0.0)
+                            
+                            export_data.append(row)
+            except Exception as e:
+                print(f"⚠️ Error reading most recent file: {e}")
+                return jsonify({'error': 'Failed to read batch results'}), 500
+        
+        if not export_data:
+            return jsonify({'error': 'No valid results to export'}), 404
         
         if format_type == 'csv':
             # Create CSV response
-            import csv
-            import io
             output = io.StringIO()
             
-            if export_data:
-                fieldnames = export_data[0].keys()
-                writer = csv.DictWriter(output, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(export_data)
+            fieldnames = export_data[0].keys()
+            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(export_data)
             
             csv_data = output.getvalue()
             output.close()
@@ -1347,18 +1551,17 @@ def download_results():
                 csv_data,
                 mimetype='text/csv',
                 headers={
-                    'Content-Disposition': f'attachment; filename=toxicity_results_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+                    'Content-Disposition': f'attachment; filename=batch_results_{datetime.now().strftime("%Y-%m-%d")}.csv'
                 }
             )
         
         elif format_type == 'json':
             from flask import Response
-            import json
             return Response(
                 json.dumps(export_data, indent=2),
                 mimetype='application/json',
                 headers={
-                    'Content-Disposition': f'attachment; filename=toxicity_results_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json'
+                    'Content-Disposition': f'attachment; filename=batch_results_{datetime.now().strftime("%Y-%m-%d")}.json'
                 }
             )
         
@@ -1371,6 +1574,67 @@ def download_results():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/api/visualize/molecule', methods=['POST'])
+def visualize_molecule():
+    """Generate molecular structure visualization from SMILES using RDKit"""
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import Draw
+        import base64
+        from io import BytesIO
+        
+        data = request.get_json()
+        if not data or 'smiles' not in data:
+            return jsonify({'error': 'SMILES string required'}), 400
+        
+        smiles = data['smiles'].strip()
+        if not smiles:
+            return jsonify({'error': 'Empty SMILES string'}), 400
+        
+        # Parse SMILES
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return jsonify({'error': 'Invalid SMILES string'}), 400
+        
+        # Get image size from request or use default
+        img_size = data.get('size', 400)
+        
+        # Generate 2D structure image
+        img = Draw.MolToImage(mol, size=(img_size, img_size))
+        
+        # Convert to base64 for frontend display
+        buffered = BytesIO()
+        img.save(buffered, format="PNG")
+        img_base64 = base64.b64encode(buffered.getvalue()).decode()
+        
+        # Get molecular properties
+        mol_weight = Chem.Descriptors.MolWt(mol)
+        num_atoms = mol.GetNumAtoms()
+        num_bonds = mol.GetNumBonds()
+        num_rings = Chem.Descriptors.RingCount(mol)
+        
+        return jsonify({
+            'success': True,
+            'smiles': smiles,
+            'image': f'data:image/png;base64,{img_base64}',
+            'properties': {
+                'molecular_weight': round(mol_weight, 2),
+                'num_atoms': num_atoms,
+                'num_bonds': num_bonds,
+                'num_rings': num_rings
+            },
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except ImportError as e:
+        print(f"❌ RDKit import error: {e}")
+        return jsonify({'error': 'RDKit not available. Please install: pip install rdkit'}), 500
+    except Exception as e:
+        print(f"❌ Visualization error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Visualization failed: {str(e)}'}), 500
 
 @app.route('/api/models/status', methods=['GET'])
 def get_model_status():

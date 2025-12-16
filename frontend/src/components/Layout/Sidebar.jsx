@@ -37,7 +37,7 @@ const Sidebar = ({ open, setOpen, collapsed, setCollapsed }) => {
           </div>
           {(!collapsed || !isDesktop) && (
             <div>
-              <h1 className="text-lg font-bold text-white">MedTox Platform</h1>
+              <h1 className="text-lg font-bold text-white">DeNovo Platform</h1>
               <p className="text-xs text-gray-400">ADMET Prediction</p>
             </div>
           )}
