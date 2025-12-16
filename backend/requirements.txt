@@ -1,7 +1,7 @@
 # DrugTox-AI Clean Backend Requirements
 flask>=2.3.0
 flask-cors>=4.0.0
-numpy>=1.21.0
+numpy>=1.21.0,<1.27.0
 pandas>=1.5.0
 scikit-learn>=1.2.0
 
@@ -15,7 +15,8 @@ transformers>=4.30.0
 torch>=2.0.0
 
 # RDKit for Advanced Molecular Descriptors
-rdkit-pypi>=2022.9.5
+# Note: RDKit may not install on all platforms. App will work without it.
+rdkit>=2023.3.1; python_version < '3.12'
 
 # Production Server
 gunicorn>=21.2.0
