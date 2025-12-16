@@ -1,6 +1,6 @@
 # DeNovo AI Platform
 
-AI-powered molecular toxicity prediction system with OCR-based ingredient extraction and intelligent chemical safety assessment.
+AI-powered molecular toxicity prediction system with ADMET properties and intelligent chemical safety assessment.
 
 ---
 
