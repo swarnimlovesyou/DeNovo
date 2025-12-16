@@ -1,133 +1,146 @@
-# 🧪 MedToXAi Platform
+# MedToXAi Platform
 
-> **AI-powered molecular toxicity prediction system with OCR image analysis and intelligent chemical safety assessment**
+AI-powered molecular toxicity prediction system with OCR-based ingredient extraction and intelligent chemical safety assessment.
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![React](https://img.shields.io/badge/React-18.0+-61DAFB.svg)](https://reactjs.org/)
-[![Flask](https://img.shields.io/badge/Flask-2.3+-000000.svg)](https://flask.palletsprojects.com/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+---
 
-## 🌟 Features
+## Overview
 
-- **🔬 Image Analysis**: Upload medicine labels, perform OCR, extract ingredients
-- **🧬 Toxicity Prediction**: Predict toxicity across 12 biological endpoints
-- **🤖 AI Integration**: Groq LLaMA 3.3 for intelligent chemical analysis
-- **📊 Advanced Analytics**: Real-time visualization with charts
-- **⚡ High Performance**: Prediction caching, rate limiting, optimized models
+MedToXAi is an end-to-end AI platform designed to analyze pharmaceutical products and predict molecular toxicity across multiple biological endpoints. The system combines OCR-based image analysis, cheminformatics, machine learning models, and large language models to support early-stage drug safety assessment.
 
-## 🚀 Quick Start
+---
+
+## Features
+
+- Image-based medicine label analysis using OCR
+- Automated ingredient extraction from uploaded images
+- Molecular toxicity prediction across 12 biological endpoints
+- AI-assisted chemical safety interpretation using Groq LLaMA 3.3
+- Real-time analytical visualizations
+- High-performance backend with caching and rate limiting
+
+---
+
+## Quick Start
 
 ### Prerequisites
-- Python 3.8+
-- Node.js 16+
-- Groq API Key
-- Supabase Account (optional)
+- Python 3.8 or higher
+- Node.js 16 or higher
+- Groq API key
+- Supabase account (optional)
 
 ### Installation
 
 ```bash
-# 1. Clone repository
+# Clone the repository
 git clone https://github.com/yourusername/medtox-scan-ai.git
 cd medtox-scan-ai
 
-# 2. Setup backend
+# Backend setup
 cd backend
 cp .env.example .env
-# Edit .env with your API keys
+# Configure environment variables
 pip install -r requirements.txt
 
-# 3. Setup frontend
+# Frontend setup
 cd ../frontend
 npm install
 
-# 4. Start platform
+# Run the platform
 # Backend: python app.py (port 5000)
 # Frontend: npm start (port 3000)
-```
-
-## 📁 Project Structure
-
-```
+Project Structure
+pgsql
+Copy code
 medtox-scan-ai/
-├── backend/           # Flask API server
-├── frontend/          # React application
-├── model-training/    # ML model training pipeline
-├── docs/             # Documentation
-└── tests/            # Test suites
-```
+├── backend/           Flask API server
+├── frontend/          React application
+├── model-training/    Machine learning training pipeline
+├── docs/              Documentation
+└── tests/             Automated tests
+Documentation
+Quick Start Guide: docs/guides/QUICK_START.md
 
-## 📚 Documentation
+Deployment Guide: docs/guides/DEPLOYMENT_GUIDE.md
 
-- **[Quick Start Guide](docs/guides/QUICK_START.md)** - Get started in 5 minutes
-- **[Deployment Guide](docs/guides/DEPLOYMENT_GUIDE.md)** - Deploy to production
-- **[Model Training Guide](docs/training/MODEL_TRAINING_GUIDE.md)** - Train new models
-- **[API Documentation](docs/guides/API_DOCUMENTATION.md)** - API reference
-- **[Full Documentation](docs/README.md)** - Complete documentation index
+Model Training Guide: docs/training/MODEL_TRAINING_GUIDE.md
 
-## 🧠 Model Training
+API Documentation: docs/guides/API_DOCUMENTATION.md
 
-Train high-accuracy toxicity prediction models:
+Full Documentation Index: docs/README.md
 
-```bash
+Model Training
+Train toxicity prediction models using curated datasets:
+
+bash
+Copy code
 cd model-training
 python scripts/train_models.py --data data/tox21_data.csv
-```
+Refer to the Model Training Guide for configuration and evaluation details.
 
-See [Model Training Guide](docs/training/MODEL_TRAINING_GUIDE.md) for details.
+Technologies
+Backend
+Flask for API services
 
-## 🎯 Key Technologies
+XGBoost for toxicity prediction models
 
-### Backend
-- **Flask** - Web framework
-- **XGBoost** - Machine learning models
-- **RDKit** - Molecular descriptors
-- **Groq AI** - LLaMA 3.3 integration
-- **Supabase** - PostgreSQL database
+RDKit for molecular descriptor computation
 
-### Frontend
-- **React 18** - UI framework
-- **Tailwind CSS** - Styling
-- **Recharts** - Data visualization
-- **Tesseract.js** - OCR engine
-- **React Hot Toast** - Notifications
+Groq AI (LLaMA 3.3) for chemical reasoning
 
-## 📊 Performance
+Supabase (PostgreSQL) for data storage
 
-- **Prediction Speed**: ~200ms/molecule
-- **Batch Processing**: ~50 molecules/minute
-- **Model Accuracy**: 84%+ ROC-AUC average
-- **API Response Time**: 500-800ms
-- **Cache Hit Rate**: 60-70%
+Frontend
+React 18 for user interface
 
-## 🔒 Security
+Tailwind CSS for styling
 
-- ✅ Input validation and sanitization
-- ✅ API rate limiting (60 req/min default)
-- ✅ CORS configuration
-- ✅ Environment variable protection
-- ✅ Secure database connections
+Recharts for data visualization
 
-## 🤝 Contributing
+Tesseract.js for OCR processing
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md).
+React Hot Toast for notifications
 
-## 📄 License
+Performance
+Average prediction time: ~200 ms per molecule
 
-This project is licensed under the MIT License - see [LICENSE](LICENSE) file.
+Batch processing throughput: ~50 molecules per minute
 
-## 🙏 Acknowledgments
+Mean ROC-AUC: >84%
 
-- **Tox21 Challenge** - Training data
-- **RDKit** - Molecular descriptors
-- **Groq** - AI inference
-- **Supabase** - Database hosting
+API response latency: 500–800 ms
 
-## 📞 Support
+Cache hit rate: approximately 60–70%
 
-- **Documentation**: [docs/README.md](docs/README.md)
-- **Issues**: [GitHub Issues](https://github.com/yourusername/medtox-scan-ai/issues)
-- **Email**: support@medtoxai.com
+Security
+Input validation and sanitization
 
----
+API rate limiting (default: 60 requests per minute)
 
-**Built with ❤️ for safer drug development**
+CORS protection
+
+Secure environment variable handling
+
+Encrypted database connections
+
+Contributing
+Contributions are welcome. Please review the Contributing Guide before submitting pull requests.
+
+License
+This project is released under the MIT License. See the LICENSE file for details.
+
+Acknowledgments
+Tox21 Challenge for toxicity datasets
+
+RDKit for cheminformatics tooling
+
+Groq for LLM inference
+
+Supabase for database infrastructure
+
+Support
+Documentation: docs/README.md
+
+Issue tracking: GitHub Issues
+
+Contact: support@medtoxai.com
