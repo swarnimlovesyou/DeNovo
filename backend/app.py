@@ -13,6 +13,10 @@ from datetime import datetime
 import uuid
 import json
 import numpy as np
+from dotenv import load_dotenv
+
+# Load environment variables FIRST before any other imports
+load_dotenv()
 
 # Add modules to path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'models'))

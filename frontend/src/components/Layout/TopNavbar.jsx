@@ -155,53 +155,6 @@ const TopNavbar = ({ setSidebarOpen, pageTitle = 'Dashboard' }) => {
             </Popover.Panel>
           </Transition>
         </Popover>
-
-        {/* Separator */}
-        <div className="hidden lg:block lg:h-6 lg:w-px lg:bg-cyan-500/20" aria-hidden="true" />
-
-        {/* Profile dropdown */}
-        <Menu as="div" className="relative">
-          <Menu.Button className="flex items-center gap-x-1 sm:gap-x-2 rounded-full bg-gray-900 p-1 sm:p-1.5 text-sm leading-6 text-cyan-400 hover:bg-gray-800 hover:scale-105 transition-all duration-300 ease-in-out">
-            <span className="sr-only">Open user menu</span>
-            <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-gradient-to-r from-cyan-500 to-teal-500 flex items-center justify-center">
-              <UserCircleIcon className="h-5 w-5 text-white" />
-            </div>
-            <span className="hidden lg:flex lg:items-center">
-              <span className="ml-2 text-sm font-semibold leading-6 text-cyan-400" aria-hidden="true">
-                User
-              </span>
-              <ChevronDownIcon className="ml-2 h-4 w-4 text-cyan-500" aria-hidden="true" />
-            </span>
-          </Menu.Button>
-          <Transition
-            as={Fragment}
-            enter="transition ease-out duration-100"
-            enterFrom="transform opacity-0 scale-95"
-            enterTo="transform opacity-100 scale-100"
-            leave="transition ease-in duration-75"
-            leaveFrom="transform opacity-100 scale-100"
-            leaveTo="transform opacity-0 scale-95"
-          >
-            <Menu.Items className="absolute right-0 z-10 mt-2.5 w-48 origin-top-right rounded-xl bg-white py-2 shadow-luxury ring-1 ring-gray-900/5 focus:outline-none">
-              {userNavigation.map((item) => (
-                <Menu.Item key={item.name}>
-                  {({ active }) => (
-                    <a
-                      href={item.href}
-                      className={clsx(
-                        active ? 'bg-gray-50' : '',
-                        'flex items-center px-3 py-2 text-sm leading-6 text-gray-900 mx-2 rounded-lg transition-colors duration-150'
-                      )}
-                    >
-                      <item.icon className="mr-3 h-4 w-4 text-gray-400" aria-hidden="true" />
-                      {item.name}
-                    </a>
-                  )}
-                </Menu.Item>
-              ))}
-            </Menu.Items>
-          </Transition>
-        </Menu>
       </div>
     </div>
   );
